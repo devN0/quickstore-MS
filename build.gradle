@@ -21,13 +21,20 @@ allprojects {
 
     repositories {
         mavenCentral()
+        maven { url 'https://artifactory-oss.prod.netflix.net/artifactory/maven-oss-candidates' }
     }
 
-//    dependencyManagement {
-//        dependencies {
-//            implementation platform('org.testcontainers:testcontainers-bom:1.17.6') //import bom
-//        }
-//    }
+    ext {
+        set('springCloudVersion', "2021.0.5")
+        set('testcontainersVersion', "1.17.6")
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.testcontainers:testcontainers-bom:${testcontainersVersion}"
+            mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+        }
+    }
 
     test {
         useJUnitPlatform()
