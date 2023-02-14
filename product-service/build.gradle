@@ -12,4 +12,5 @@ dependencies {
 //    implementation platform('org.testcontainers:testcontainers-bom:1.17.6') //import bom
     testImplementation('org.testcontainers:mongodb') //no version specified
     testImplementation "org.testcontainers:junit-jupiter"
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
 }

@@ -22,7 +22,7 @@ import java.util.UUID;
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final WebClient webClient;
+    private final WebClient.Builder webClientBuilder;
 
     /**
      *
@@ -46,13 +46,13 @@ public class OrderService {
                 .toList();
 
         // 2. Fetch inventory status for each product in orderLineItemsList by calling api/inventory via webClient
-        InventoryResponse[] inventoryResponseArray = webClient.get()
-                .uri("http://localhost:8082/api/inventory",
+        InventoryResponse[] inventoryResponseArray = webClientBuilder.build().get()
+                .uri("http://inventory-service/api/inventory",
                         uriBuilder -> uriBuilder.queryParam("skuCodes", skuCodes)
                                 .build())
                 .retrieve()
                 .bodyToMono(InventoryResponse[].class)
-                .block(); // by default webclient will make async request, in order to maky sync call use block().
+                .block(); // by default webclient will make async request, in order to make sync call use block().
 
         // 3. Check if all products in inventoryResponse are in stock or not
         boolean allProductsInStock = Arrays.stream(inventoryResponseArray)
