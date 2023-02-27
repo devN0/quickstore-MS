@@ -13,4 +13,6 @@ dependencies {
     testImplementation('org.testcontainers:mongodb') //no version specified
     testImplementation "org.testcontainers:junit-jupiter"
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+    implementation 'org.springframework.cloud:spring-cloud-starter-sleuth'
+    implementation 'org.springframework.cloud:spring-cloud-sleuth-zipkin'
 }

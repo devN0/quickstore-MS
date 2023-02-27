@@ -8,6 +8,8 @@ import com.quickstore.orderservice.model.Order;
 import com.quickstore.orderservice.model.OrderLineItems;
 import com.quickstore.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cloud.sleuth.Span;
+import org.springframework.cloud.sleuth.Tracer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -23,12 +25,13 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final WebClient.Builder webClientBuilder;
+    private final Tracer tracer;
 
     /**
      *
      * @param orderRequest - contains a list of orderLineItems
      */
-    public void placeOrder(OrderRequest orderRequest) {
+    public String placeOrder(OrderRequest orderRequest) {
         Order order = new Order();
         order.setOrderNumber(UUID.randomUUID().toString());
 
@@ -45,23 +48,29 @@ public class OrderService {
                 .map(OrderLineItems::getSkuCode)
                 .toList();
 
-        // 2. Fetch inventory status for each product in orderLineItemsList by calling api/inventory via webClient
-        InventoryResponse[] inventoryResponseArray = webClientBuilder.build().get()
-                .uri("http://inventory-service/api/inventory",
-                        uriBuilder -> uriBuilder.queryParam("skuCodes", skuCodes)
-                                .build())
-                .retrieve()
-                .bodyToMono(InventoryResponse[].class)
-                .block(); // by default webclient will make async request, in order to make sync call use block().
+        Span inventoryServiceLookup = tracer.nextSpan().name("InventoryServiceLookup");
+        try(Tracer.SpanInScope spanInScope = tracer.withSpan(inventoryServiceLookup.start())) {
+            // 2. Fetch inventory status for each product in orderLineItemsList by calling api/inventory via webClient
+            InventoryResponse[] inventoryResponseArray = webClientBuilder.build().get()
+                    .uri("http://inventory-service/api/inventory",
+                            uriBuilder -> uriBuilder.queryParam("skuCodes", skuCodes)
+                                    .build())
+                    .retrieve()
+                    .bodyToMono(InventoryResponse[].class)
+                    .block(); // by default webclient will make async request, in order to make sync call use block().
 
-        // 3. Check if all products in inventoryResponse are in stock or not
-        boolean allProductsInStock = Arrays.stream(inventoryResponseArray)
-                .allMatch(InventoryResponse::isInStock);
+            // 3. Check if all products in inventoryResponse are in stock or not
+            boolean allProductsInStock = Arrays.stream(inventoryResponseArray)
+                    .allMatch(InventoryResponse::isInStock);
 
-        if (allProductsInStock) {
-            orderRepository.save(order);
-        } else {
-            throw new ProductNotInStockException("Product not in stock");
+            if(allProductsInStock) {
+                orderRepository.save(order);
+                return "Order placed successfully";
+            } else {
+                throw new ProductNotInStockException("Product not in stock");
+            }
+        } finally {
+            inventoryServiceLookup.end();
         }
     }
 
