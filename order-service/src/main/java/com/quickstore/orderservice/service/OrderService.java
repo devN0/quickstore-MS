@@ -3,6 +3,7 @@ package com.quickstore.orderservice.service;
 import com.quickstore.inventoryservice.dto.InventoryResponse;
 import com.quickstore.orderservice.dto.OrderLineItemsDto;
 import com.quickstore.orderservice.dto.OrderRequest;
+import com.quickstore.orderservice.events.OrderPlacedEvent;
 import com.quickstore.orderservice.exceptions.ProductNotInStockException;
 import com.quickstore.orderservice.model.Order;
 import com.quickstore.orderservice.model.OrderLineItems;
@@ -10,6 +11,7 @@ import com.quickstore.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cloud.sleuth.Span;
 import org.springframework.cloud.sleuth.Tracer;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -26,6 +28,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final WebClient.Builder webClientBuilder;
     private final Tracer tracer;
+    private final KafkaTemplate<String, OrderPlacedEvent> kafkaTemplate;
 
     /**
      *
@@ -65,6 +68,7 @@ public class OrderService {
 
             if(allProductsInStock) {
                 orderRepository.save(order);
+                kafkaTemplate.send("NotificationTopic", new OrderPlacedEvent(order.getOrderNumber()));
                 return "Order placed successfully";
             } else {
                 throw new ProductNotInStockException("Product not in stock");
