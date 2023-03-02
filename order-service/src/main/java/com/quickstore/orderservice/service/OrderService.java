@@ -68,7 +68,7 @@ public class OrderService {
 
             if(allProductsInStock) {
                 orderRepository.save(order);
-                kafkaTemplate.send("NotificationTopic", new OrderPlacedEvent(order.getOrderNumber()));
+                kafkaTemplate.send("notificationTopic", new OrderPlacedEvent(order.getOrderNumber()));
                 return "Order placed successfully";
             } else {
                 throw new ProductNotInStockException("Product not in stock");
