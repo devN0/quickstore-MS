@@ -1,0 +1,6 @@
+FROM openjdk:17
+
+COPY build/libs/api-gateway-1.0-SNAPSHOT.jar /app.jar
+
+# RUN THE JAR FILE WHENEVER THE CONTAINER RUNS
+ENTRYPOINT ["java", "-jar", "/app.jar"]
