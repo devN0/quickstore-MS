@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '2.7.8'
     id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+    id 'com.google.cloud.tools.jib' version '3.2.1'
 }
 
 allprojects {
@@ -38,5 +39,54 @@ allprojects {
 
     test {
         useJUnitPlatform()
+    }
+}
+
+jibDockerBuild.enabled = false
+
+subprojects {
+    apply plugin: 'com.google.cloud.tools.jib'
+    jib {
+        from {
+            image = 'eclipse-temurin:17.0.4.1_1-jre'
+            auth {
+                username = property('dockerHubUsername')
+                password = property('dockerHubPassword')
+            }
+        }
+        to {
+            image = "devnoop/${project.name}"
+            auth {
+                username = property('dockerHubUsername')
+                password = property('dockerHubPassword')
+            }
+        }
+
+//Specifying the main class for each subproject
+        if(project.name == 'api-gateway'){
+            container{
+                mainClass = 'com.quickstore.ApiGatewayApplication'
+            }
+        } else if(project.name == 'discovery-server'){
+            container{
+                mainClass = 'com.quickstore.discoveryserver.DiscoveryServerApplication'
+            }
+        } else if(project.name == 'inventory-service'){
+            container{
+                mainClass = 'com.quickstore.inventoryservice.InventoryServiceApplication'
+            }
+        } else if(project.name == 'product-service'){
+            container{
+                mainClass = 'com.quickstore.productservice.ProductServiceApplication'
+            }
+        } else if(project.name == 'order-service'){
+            container{
+                mainClass = 'com.quickstore.orderservice.OrderServiceApplication'
+            }
+        } else if(project.name == 'notification-service'){
+            container{
+                mainClass = 'com.quickstore.notificationservice.NotificationServiceApplication'
+            }
+        }
     }
 }
