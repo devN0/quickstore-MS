@@ -67,7 +67,7 @@ subprojects {
             container{
                 mainClass = 'com.quickstore.ApiGatewayApplication'
             }
-        } else if(project.name == 'discovery-server'){
+        } else if(project.name == 'discover-server'){
             container{
                 mainClass = 'com.quickstore.discoveryserver.DiscoveryServerApplication'
             }

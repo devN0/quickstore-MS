@@ -2,9 +2,80 @@
 version: '3'
 services:
 #  EXTERNAL SERVICES
-
   postgres-order:
-    image:
+    image: postgres:15.2-alpine3.17
+    environment:
+      POSTGRES_DB: order-service
+      POSTGRES_USER: username
+      POSTGRES_PASSWORD: password
+      PGDATA: /data/postgres
+    volumes:
+      - ./postgres-order:/data/postgres
+    # 'ports' - for exposing container port to host
+    ports:
+      - "5431:5431"
+    # 'expose' - for exposing port to other containers in the same network
+    expose:
+      - "5431"
+    command: -p 5431
+    restart: always
+
+  postgres-inventory:
+    image: postgres:15.2-alpine3.17
+    environment:
+      POSTGRES_DB: inventory-service
+      POSTGRES_USER: username
+      POSTGRES_PASSWORD: password
+      PGDATA: /data/postgres
+    volumes:
+      - ./postgres-inventory:/data/postgres
+    ports:
+      - "5432:5432"
+    expose:
+      - "5432"
+    restart: always
+
+  ## Mongo Docker Compose Config
+  mongo:
+    container_name: mongo
+    image: mongo:4.4.14-rc0-focal
+    volumes:
+      - ./mongo-data:/data/db
+    ports:
+      - "27017:27017"
+    expose:
+      - "27017"
+    restart: always
+
+  ## Keycloak Config with Mysql database
+  keycloak-mysql:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: keycloak
+      MYSQL_USER: keycloak
+      MYSQL_PASSWORD: password
+    volumes:
+      - ./mysql_keycloak_data:/var/lib/mysql
+
+  keycloak:
+    container_name: keycloak
+    image: quay.io/keycloak/keycloak:18.0.0
+    command: [ "start-dev", "--import-realm" ]
+    environment:
+      DB_VENDOR: MYSQL
+      DB_ADDR: mysql
+      DB_DATABASE: keycloak
+      DB_USER: keycloak
+      DB_PASSWORD: password
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - ./realms/:/opt/keycloak/data/import/
+    ports:
+      - "8080:8080"
+    depends_on:
+      - keycloak-mysql
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.0
@@ -28,3 +99,81 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+
+# PRIMARY BACKEND SERVICES
+  zipkin:
+    container_name: zipkin
+    image: openzipkin/zipkin
+    ports:
+      - "9411:9411"
+
+  ## Eureka Server
+  discovery-server:
+    container_name: discovery-server
+    image: devnoop/discover-server:latest
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    ports:
+      - "8761:8761"
+    depends_on:
+      - zipkin
+
+  api-gateway:
+    container_name: api-gateway
+    image: devnoop/api-gateway:latest
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY= TRACE
+    ports:
+      - "8181:8080"
+    expose:
+      - "8181"
+    depends_on:
+      - zipkin
+      - discovery-server
+      - keycloak
+
+  ## Product-Service Docker Compose Config
+  product-service:
+    container_name: product-service
+    image: devnoop/product-service:latest
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      - mongo
+      - discovery-server
+      - api-gateway
+
+  order-service:
+    container_name: order-service
+    image: devnoop/order-service:latest
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-order:5431/order-service
+    depends_on:
+      - postgres-order
+      - broker
+      - discovery-server
+      - api-gateway
+
+  inventory-service:
+    container_name: inventory-service
+    image: devnoop/inventory-service:latest
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-inventory:5432/inventory-service
+    depends_on:
+      - postgres-inventory
+      - discovery-server
+      - api-gateway
+
+  notification-service:
+    container_name: notification-service
+    image: devnoop/notification-service:latest
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      - broker
+      - discovery-server
+      - api-gateway
